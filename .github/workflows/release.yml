@@ -1,0 +1,26 @@
+# Publishes a GitHub release with the DMG whenever a version tag (v*) is pushed.
+# The website links to releases/latest/download/DriveTranscribe-beta.dmg, so the newest release is what people get.
+name: Publish release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create the release with the DMG
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          test -s DriveTranscribe-beta.dmg
+          gh release create "$TAG" DriveTranscribe-beta.dmg \
+            --title "DriveTranscribe for Mac ${TAG#v}" \
+            --notes-file RELEASE_NOTES.md \
+            --latest
