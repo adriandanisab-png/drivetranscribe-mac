@@ -1,10 +1,13 @@
-# Publishes a GitHub release with the DMG whenever a version tag (v*) is pushed.
-# The website links to releases/latest/download/DriveTranscribe-beta.dmg, so the newest release is what people get.
+# Publishes a GitHub release with the DMG whenever the DMG or VERSION changes on main
+# (or when run by hand). The tag comes from the VERSION file. The website links to
+# releases/latest/download/DriveTranscribe-beta.dmg, so the newest release is what people get.
 name: Publish release
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+    paths: ["DriveTranscribe-beta.dmg", "VERSION", "RELEASE_NOTES.md"]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -14,13 +17,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Create the release with the DMG
+      - name: Create or update the release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
         run: |
-          test -s DriveTranscribe-beta.dmg
-          gh release create "$TAG" DriveTranscribe-beta.dmg \
-            --title "DriveTranscribe for Mac ${TAG#v}" \
-            --notes-file RELEASE_NOTES.md \
-            --latest
+          TAG="$(tr -d '[:space:]' < VERSION)"
+          test -n "$TAG" && test -s DriveTranscribe-beta.dmg
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            # Same version again: replace the DMG and notes.
+            gh release upload "$TAG" DriveTranscribe-beta.dmg --clobber
+            gh release edit "$TAG" --notes-file RELEASE_NOTES.md --latest
+          else
+            gh release create "$TAG" DriveTranscribe-beta.dmg \
+              --target "$GITHUB_SHA" \
+              --title "DriveTranscribe for Mac ${TAG#v}" \
+              --notes-file RELEASE_NOTES.md \
+              --latest
+          fi
